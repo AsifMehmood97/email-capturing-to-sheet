@@ -9,6 +9,6 @@ SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
 RANGE_NAME = os.environ.get("RANGE_NAME")
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL")) or 10
-EXTENSIONS = [
+EXTENSIONS = (
     extension for extension in os.environ.get("EXTENSIONS").split(',')
-] or ['.png', '.jpeg', '.jpg', '.pdf']
+) or ('.png', '.jpeg', '.jpg', '.pdf')
