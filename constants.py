@@ -6,9 +6,9 @@ IMAP_SERVER = os.environ.get("IMAP_SERVER")
 INVOICE_API_URL = os.environ.get("INVOICE_API_URL")
 SERVICE_ACCOUNT_FILE = os.environ.get("SERVICE_ACCOUNT_FILE")
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID")
-RANGE_NAME = os.environ.get("RANGE_NAME")
+RANGE_NAME = 'Sheet1!A1'
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL")) or 10
+CHECK_INTERVAL = int(os.environ.get("CHECK_INTERVAL")) if os.environ.get("CHECK_INTERVAL") else 10
 EXTENSIONS = (
     extension for extension in os.environ.get("EXTENSIONS").split(',')
-) or ('.png', '.jpeg', '.jpg', '.pdf')
+) if os.environ.get("EXTENSIONS") else ('.png', '.jpeg', '.jpg', '.pdf')

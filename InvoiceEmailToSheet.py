@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import time
 from tqdm import tqdm
 import requests
+from email.parser import BytesParser
+from email import policy
 from constants import (
     EMAIL,
     PASSWORD,
@@ -72,22 +74,57 @@ def request_invoice_api(file_content, filename):
         return response.json()
     return ""
 
+def extract_attachments_from_eml(eml_content):
+    """
+    Extract and process attachments from an .eml file.
+    """
+    msg = BytesParser(policy=policy.default).parsebytes(eml_content)
+    for part in msg.iter_parts():
+        content_disposition = str(part.get("Content-Disposition"))
+        if "attachment" in content_disposition:
+            filename = part.get_filename()
+            if filename:
+                filename, encoding = decode_header(filename)[0]
+                if isinstance(filename, bytes):
+                    filename = filename.decode(encoding if encoding else "utf-8")
+                if filename.lower().endswith(EXTENSIONS):
+                    file_content = part.get_payload(decode=True)
+                    response = request_invoice_api(file_content, filename)
+                    if response:
+                        file_name_key = list(response.keys())[0]
+                        add_row_to_sheet(response[file_name_key], file_name_key)
+                    else:
+                        print(f"Failed to process attachment in .eml: {filename}.")
+
 def process_email(msg):
     subject, encoding = decode_header(msg["Subject"])[0]
     if isinstance(subject, bytes):
         subject = subject.decode(encoding if encoding else 'utf-8')
     from_ = msg.get("From")
+    print(f"Subject: {subject}")
+    print(f"From: {from_}")
     if msg.is_multipart():
         for part in msg.walk():
             content_type = part.get_content_type()
             content_disposition = str(part.get("Content-Disposition"))
-            if "attachment" in content_disposition:
+            print(f"Content-Disposition: {content_disposition}")
+            if "attachment" in content_disposition or part.get_content_disposition() == "inline":
                 filename = part.get_filename()
+                print(f"attachment filename: {filename}")
                 if filename:
                     filename, encoding = decode_header(filename)[0]
                     if isinstance(filename, bytes):
                         filename = filename.decode(encoding if encoding else 'utf-8')
-                    if filename.lower().endswith(EXTENSIONS):
+                    
+                    # Process .eml files
+                    if filename.lower().endswith(".eml"):
+                        print(f"Found .eml file: {filename}. Extracting content.")
+                        eml_content = part.get_payload(decode=True)
+                        extract_attachments_from_eml(eml_content)
+
+                    # Process other file types
+                    elif filename.lower().endswith(EXTENSIONS):
+                        print(f"Found file: {filename}. Extracting content.")
                         file_content = part.get_payload(decode=True)
                         response = request_invoice_api(file_content, filename)
                         if response:
@@ -109,12 +146,15 @@ def check_inbox():
             return
         for email_id in tqdm(email_ids):
             status, msg_data = mail.fetch(email_id, "(RFC822)")
+            print(f"Status: {status}")
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
+                    print(f"About to process email: {email_id}")
                     msg = email.message_from_bytes(response_part[1])
                     email_date = msg.get("Date")
                     email_datetime = email.utils.parsedate_to_datetime(email_date)
                     if email_datetime > script_start_time:
+                        print(f"Processing email: {email_id}")
                         process_email(msg)
         for email_id in email_ids:
             mail.store(email_id, '+FLAGS', '\\Seen')
